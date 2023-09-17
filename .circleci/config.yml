@@ -72,7 +72,7 @@ jobs:
               chmod +x deploy.sh
               ./deploy.sh
               # Wait for deploy success 
-              kubectl wait  --for=condition=ready pod -l app=helloworld-cluster
+              kubectl wait  --for=condition=ready pod -l app=helloworld-capstone
               sleep 30s
 
    smoke-test:
@@ -97,7 +97,7 @@ jobs:
             name: Frontend smoke test.
             command: |
               # Integrate kubectl with aws eks
-              aws eks update-kubeconfig --region us-east-1 --name helloworld-cluster
+              aws eks update-kubeconfig --region us-east-1 --name helloworld-capstone-cluster
               export KUBECONFIG=~/.kube/config
               # get URL
               export hostname=$(kubectl get services helloworld-service  -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
