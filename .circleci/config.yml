@@ -103,7 +103,7 @@ jobs:
               export hostname=$(kubectl get services helloworld-service  -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
               export url="http://${hostname}:8080"
               # test
-              if curl -X GET ${url} | grep -q "Hello World"
+              if curl -X GET ${url} | grep -q "Hello world, linh626688"
               then
                 echo "Deploy successfully! URL: ${url}"
               else
