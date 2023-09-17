@@ -29,7 +29,6 @@ jobs:
          - run:
             name: build and tag docker hub
             command: |
-               cd HelloWorld
                # login
                docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PASSWORD}
                # build image
