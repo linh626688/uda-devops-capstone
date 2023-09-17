@@ -4,20 +4,20 @@ kind: Deployment
 metadata:
   name: helloworld-deployment
   labels:
-    app: helloworld
+    app: helloworld-capstone
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: helloworld
+      app: helloworld-capstone
   template:
     metadata:
       labels:
-        app: helloworld
+        app: helloworld-capstone
     spec:
       containers:
-        - name: helloworld
-          image: duynn03/helloworld:latest
+        - name: helloworld-capstone
+          image: linh626688/helloworld-capstone:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80
@@ -33,5 +33,5 @@ spec:
       protocol: TCP
       targetPort: 80  
   selector:
-    app: helloworld
+    app: helloworld-capstone
   type: LoadBalancer

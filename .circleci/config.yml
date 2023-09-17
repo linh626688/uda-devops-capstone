@@ -2,25 +2,127 @@
 # See: https://circleci.com/docs/configuration-reference
 version: 2.1
 
-# Define a job to be invoked later in a workflow.
-# See: https://circleci.com/docs/configuration-reference/#jobs
-jobs:
-  say-hello:
-    # Specify the execution environment. You can specify an image from Docker Hub or use one of our convenience images from CircleCI's Developer Hub.
-    # See: https://circleci.com/docs/configuration-reference/#executor-job
-    docker:
-      - image: cimg/base:stable
-    # Add steps to the job
-    # See: https://circleci.com/docs/configuration-reference/#steps
-    steps:
-      - checkout
-      - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+jobs:              
+   test-frontend:
+      docker: 
+         - image: python:3.7.3-stretch
+      steps:
+         - checkout # checkout source code from git
+         - run:
+             name: Install dependencies
+             command: |
+               make install
+         - run:
+             name: check lint
+             command: |
+               make lint
 
-# Orchestrate jobs using workflows
-# See: https://circleci.com/docs/configuration-reference/#workflows
+   docker-build:
+      docker:
+         - image: cimg/go:1.17
+      working_directory: ~/repo
+      steps:
+         - checkout
+         - setup_remote_docker:
+            version: 20.10.14
+            docker_layer_caching: true
+         - run:
+            name: build and tag docker hub
+            command: |
+               cd HelloWorld
+               # login
+               docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PASSWORD}
+               # build image
+               docker build -t helloworld-capstone:latest .
+               # list image
+               docker images
+               # push to DockerHub
+               docker tag helloworld-capstone:latest ${DOCKERHUB_USERNAME}/helloworld-capstone:latest
+               docker push ${DOCKERHUB_USERNAME}/helloworld-capstone:latest
+
+   deploy-infrastructure:
+      docker:
+         - image: amazon/aws-cli
+      steps:
+         - checkout # checkout source code from git         
+         - run:
+            name: Install tar
+            command: |
+              yum -y install tar gzip gettext
+         - run: 
+            name: Install Kubectl
+            command: |
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" &&\
+              install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+         - run: 
+            name: Install EKSctl
+            command: |
+              curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+              mv /tmp/eksctl /usr/local/bin
+         - run:
+            name: Create EKS cluster
+            command: |
+              cd .circleci/cloudFormations/EKS
+              chmod +x create_cluster.sh
+              ./create_cluster.sh
+         - run:
+            name: Deploy app
+            command: |
+              cd .circleci/deployApp
+              # deploy app
+              chmod +x deploy_app.sh
+              ./deploy_app.sh
+              # Wait for deploy success 
+              kubectl wait  --for=condition=ready pod -l app=helloworld
+              sleep 30s
+
+   smoke-test:
+      docker:
+         - image: amazon/aws-cli
+      steps:
+         - run:
+            name: Install tar
+            command: |
+              yum -y install tar gzip gettext
+         - run: 
+            name: Install Kubectl
+            command: |
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" &&\
+              install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+         - run: 
+            name: Install EKSctl
+            command: |
+              curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+              mv /tmp/eksctl /usr/local/bin
+         - run:
+            name: Frontend smoke test.
+            command: |
+              # Integrate kubectl with aws eks
+              aws eks update-kubeconfig --region us-east-1 --name helloworld-cluster
+              export KUBECONFIG=~/.kube/config
+              # get URL
+              export hostname=$(kubectl get services helloworld-service  -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
+              export url="http://${hostname}:8080"
+              # test
+              if curl -X GET ${url} | grep -q "Hello World"
+              then
+                echo "Deploy successfully! URL: ${url}"
+              else
+                echo "Deploy fail!. Rollback previous deployment. URL: ${url}"
+                kubectl rollout undo deployment/helloworld-deployment
+                kubectl rollout status deployment helloworld-deployment --timeout=90s
+              fi
+            
 workflows:
-  say-hello-workflow:
+  default:
     jobs:
-      - say-hello
+      - test-frontend
+      - docker-build:
+          requires: [test-frontend]
+          filters:
+            branches:
+              only: [main]
+      - deploy-infrastructure:
+          requires: [docker-build]
+      - smoke-test:
+          requires: [deploy-infrastructure]
