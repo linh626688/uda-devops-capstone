@@ -7,9 +7,9 @@ jobs:
       docker: 
          - image: python:3.7.3-stretch
       steps:
-         - checkout # checkout source code from git
+         - checkout
          - run:
-             name: Install dependencies
+             name: Install Dependencies
              command: |
                make install
          - run:
@@ -27,15 +27,11 @@ jobs:
             version: 20.10.14
             docker_layer_caching: true
          - run:
-            name: build and tag docker hub
+            name: docker push
             command: |
-               # login
                docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PASSWORD}
-               # build image
                docker build -t helloworld-capstone:latest .
-               # list image
                docker images
-               # push to DockerHub
                docker tag helloworld-capstone:latest ${DOCKERHUB_USERNAME}/helloworld-capstone:latest
                docker push ${DOCKERHUB_USERNAME}/helloworld-capstone:latest
 
@@ -43,19 +39,13 @@ jobs:
       docker:
          - image: amazon/aws-cli
       steps:
-         - checkout # checkout source code from git         
-         - run:
-            name: Install tar
+         - checkout    
+         - run: 
+            name: Install Dependences
             command: |
               yum -y install tar gzip gettext
-         - run: 
-            name: Install Kubectl
-            command: |
               curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" &&\
               install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-         - run: 
-            name: Install EKSctl
-            command: |
               curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
               mv /tmp/eksctl /usr/local/bin
          - run:
@@ -68,10 +58,8 @@ jobs:
             name: Deploy app
             command: |
               cd .circleci/deploy
-              # deploy app
               chmod +x deploy.sh
               ./deploy.sh
-              # Wait for deploy success 
               kubectl wait  --for=condition=ready pod -l app=helloworld-capstone
               sleep 30s
 
@@ -79,30 +67,21 @@ jobs:
       docker:
          - image: amazon/aws-cli
       steps:
-         - run:
-            name: Install tar
+         - run: 
+            name: Install Dependences
             command: |
               yum -y install tar gzip gettext
-         - run: 
-            name: Install Kubectl
-            command: |
               curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" &&\
               install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-         - run: 
-            name: Install EKSctl
-            command: |
               curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
               mv /tmp/eksctl /usr/local/bin
          - run:
             name: Frontend smoke test.
             command: |
-              # Integrate kubectl with aws eks
               aws eks update-kubeconfig --region us-east-1 --name helloworld-capstone-cluster
               export KUBECONFIG=~/.kube/config
-              # get URL
               export hostname=$(kubectl get services helloworld-service  -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
               export url="http://${hostname}:8080"
-              # test
               if curl -X GET ${url} | grep -q "Hello world, linh626688"
               then
                 echo "Deploy successfully! URL: ${url}"
@@ -118,9 +97,9 @@ workflows:
       - test-frontend
       - docker-build:
           requires: [test-frontend]
-         #  filters:
-         #    branches:
-         #      only: [main]
+          filters:
+            branches:
+              only: [main]
       - deploy-infrastructure:
           requires: [docker-build]
       - smoke-test:
