@@ -61,18 +61,18 @@ jobs:
          - run:
             name: Create EKS cluster
             command: |
-              cd .circleci/cloudFormations/EKS
-              chmod +x create_cluster.sh
-              ./create_cluster.sh
+              cd .circleci/eks
+              chmod +x cluster.sh
+              ./cluster.sh
          - run:
             name: Deploy app
             command: |
-              cd .circleci/deployApp
+              cd .circleci/deploy
               # deploy app
-              chmod +x deploy_app.sh
-              ./deploy_app.sh
+              chmod +x deploy.sh
+              ./deploy.sh
               # Wait for deploy success 
-              kubectl wait  --for=condition=ready pod -l app=helloworld
+              kubectl wait  --for=condition=ready pod -l app=helloworld-cluster
               sleep 30s
 
    smoke-test:
