@@ -119,9 +119,9 @@ workflows:
       - test-frontend
       - docker-build:
           requires: [test-frontend]
-          filters:
-            branches:
-              only: [main]
+         #  filters:
+         #    branches:
+         #      only: [main]
       - deploy-infrastructure:
           requires: [docker-build]
       - smoke-test:
